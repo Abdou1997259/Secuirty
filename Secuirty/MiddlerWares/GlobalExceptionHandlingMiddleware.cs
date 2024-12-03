@@ -27,13 +27,28 @@ namespace Secuirty.MiddlerWares
                 _logger.LogError(ex.Message, ex);
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 context.Response.ContentType = "application/json";
-                var response = new Response<string>
+                if (ex is FluentValidation.ValidationException validations)
                 {
-                    Message = "Internal Server Error",
-                    StatusCode = StatusCodes.Status500InternalServerError,
+                    var response = new Response<string>
+                    {
+                        Message = string.Join(", ", validations.Errors),
+                        StatusCode = StatusCodes.Status422UnprocessableEntity,
 
-                };
-                await context.Response.WriteAsync(response.ToString());
+                    };
+                    await context.Response.WriteAsync(response.ToString());
+                }
+                else
+                {
+                    var response = new Response<string>
+                    {
+                        Message = "Internal Server Error",
+                        StatusCode = StatusCodes.Status500InternalServerError,
+
+                    };
+                    await context.Response.WriteAsync(response.ToString());
+
+                }
+
             }
         }
     }

@@ -1,4 +1,5 @@
 using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Secuirty.Behaviors;
 using Secuirty.Date;
 using Secuirty.Dtos;
 using Secuirty.Extentions;
@@ -18,18 +20,47 @@ using System;
 using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
+#region logging Register 
 var logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
-builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
 builder.Services.AddSerilog(logger);
-builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
-// Add services to the container.
+#endregion
+
+#region System Registering  Dependecies
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+#endregion
+
+#region Db Register
 builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+#endregion
+
+
+
+#region Register Mediator and validations
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
+// Add services to the container.
+
+#endregion
+
+#region Settings From app Settings
 var jwt = new Jwt();
 builder.Configuration.GetSection("Jwt").Bind(jwt);
 builder.Services.AddSingleton(jwt);
-builder.Services.AddControllers();
+
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+#endregion
+
+#region  Authentication Register
+
+
 builder.Services.AddIdentity<User, IdentityRole>(
    options =>
    {
@@ -66,27 +97,45 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+#endregion
+
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
+
+#region Register Services
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
 
+#endregion
+
+
+#region Swagger Services
 builder.Services.AddSwaggerGen();
+#endregion
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+#region Swagger MiddleWares
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+#endregion
+
+#region Custom MiddleWares
 app.UseCustomMiddleWares();
+#endregion
+
+#region System MiddleWares
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+#endregion
 
 app.Run();

@@ -14,11 +14,21 @@ namespace Secuirty.Validators
         }
         public void Validations()
         {
-            RuleFor(x => x.Email).MustAsync(async (email, _) =>
-            await _validationService.UserExistenceByEmail(email)).WithMessage("Already existed");
+            RuleFor(x => x.Email)
+             .Cascade(CascadeMode.Stop)
+             .NotNull().WithMessage("{PropertyName} must have a value")
+             .NotEmpty().WithMessage("{PropertyName} must have a value")
+             .EmailAddress().WithMessage("Invalid {PropertyName}")
+             .MustAsync(async (email, _) => await _validationService.UserExistenceByEmail(email))
+             .WithMessage("{PropertyName} is already existed");
 
-            RuleFor(x => x.UserName).MustAsync(async (username, _) => await
-            _validationService.UserExistenceByUserName(username)).WithMessage("Already existed");
+            RuleFor(x => x.UserName)
+                .Cascade(CascadeMode.Stop)
+                .NotNull().WithMessage("{PropertyName} must have a value")
+                .NotEmpty().WithMessage("{PropertyName} must have a value")
+                .MustAsync(async (username, _) => await _validationService.UserExistenceByUserName(username))
+                .WithMessage("{PropertyName} is already existed");
+
 
 
         }

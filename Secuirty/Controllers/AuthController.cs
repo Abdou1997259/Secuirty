@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MediatR;
+using Microsoft.AspNetCore.Mvc;
+using Secuirty.Commands;
 using Secuirty.Dtos;
 using Secuirty.Services;
 using System.Threading.Tasks;
@@ -10,14 +12,16 @@ namespace Secuirty.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _service;
-        public AuthController(IAuthService service)
+        private readonly ISender _sender;
+        public AuthController(IAuthService service, ISender sender)
         {
             _service = service;
+            _sender = sender;
         }
         [HttpPost("Register")]
-        public async Task<IActionResult> Register(RegisterModel model)
+        public async Task<IActionResult> Register(RegisterUserCommand model)
         {
-            var result = await _service.RegisterAsync(model);
+            var result = await _sender.Send(model);
 
             return CreateResponse(result);
         }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Secuirty.Commands;
 using Secuirty.Date;
 using Secuirty.Dtos;
 using Secuirty.Helper;
@@ -56,6 +57,7 @@ namespace Secuirty.Services
             using (var generator = RandomNumberGenerator.Create())
             {
                 generator.GetBytes(numbers);
+
 
             }
             return Convert.ToBase64String(numbers);
@@ -181,22 +183,13 @@ namespace Secuirty.Services
             };
         }
 
-        public async Task<Response<AutModel>> RegisterAsync(RegisterModel model)
+        public async Task<Response<AutModel>> RegisterAsync(RegisterUserCommand model)
         {
             var transaction = _context.Database.BeginTransaction();
             try
             {
 
-                var validator = await _userValidator.ValidateAsync(model);
-                if (!validator.IsValid)
-                {
-                    return new Response<AutModel>
-                    {
-                        IsSuccess = false,
-                        StatusCode = (int)HttpStatusCode.BadRequest,
-                        Message = string.Join(", ", validator.Errors.Select(x => x.ErrorMessage))
-                    };
-                }
+
 
                 var user = new User
                 {
