@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -15,7 +16,6 @@ using Secuirty.Services;
 using Serilog;
 using System;
 using System.Text;
-
 var builder = WebApplication.CreateBuilder(args);
 
 var logger = new LoggerConfiguration()
@@ -23,6 +23,7 @@ var logger = new LoggerConfiguration()
     .CreateLogger();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddSerilog(logger);
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 // Add services to the container.
 builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 var jwt = new Jwt();
@@ -69,6 +70,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IValidationService, ValidationService>();
 
 builder.Services.AddSwaggerGen();
 

@@ -57,6 +57,22 @@ namespace Secuirty.Controllers
             return CreateResponse(result);
 
         }
+        [HttpPost("ForgetPassword")]
+        public async Task<IActionResult> ForgetPasswordAsync(string email)
+        {
+            var result = await _service.ForgetPasswordAsync(email);
+
+            return CreateResponse(result);
+
+        }
+        [HttpPost("ResetPassword")]
+        public async Task<IActionResult> ResetPasswordAsync(ResetPasswordModel model)
+        {
+            var result = await _service.ResetPasswordAsync(model);
+
+            return CreateResponse(result);
+
+        }
         private IActionResult CreateResponse<T>(Response<T> response)
         {
             return StatusCode(response.StatusCode, response);

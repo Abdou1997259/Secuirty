@@ -1,4 +1,5 @@
 ﻿
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -28,12 +29,16 @@ namespace Secuirty.Services
         private Context _context;
         private readonly IEmailService _emailService;
         private readonly ILogger<AuthService> _logger;
+        private readonly IValidator<RegisterModel> _userValidator;
+        private readonly IValidator<RefreshTokenModel> _refreshToken;
         public AuthService(
              UserManager<User> userManager,
              Context context,
              Jwt jwt,
              IEmailService emailService,
-             ILogger<AuthService> logger
+             ILogger<AuthService> logger,
+             IValidator<RegisterModel> userValidator,
+             IValidator<RefreshTokenModel> refreshToken
             )
         {
             _userManger = userManager;
@@ -41,6 +46,8 @@ namespace Secuirty.Services
             _context = context;
             _emailService = emailService;
             _logger = logger;
+            _userValidator = userValidator;
+            _refreshToken = refreshToken;
 
         }
         private string GenerateRefreshToken()
@@ -57,42 +64,20 @@ namespace Secuirty.Services
         {
             try
             {
-                var princple = GetClaimsPrincipalFromToken(model.AccessToken);
-                var userId = princple?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (userId == null)
+                var refreshTokenValidator = await _refreshToken.ValidateAsync(model);
+                if (!refreshTokenValidator.IsValid)
                 {
-
-                    return new Dtos.Response<AutModel>
+                    return new Response<AutModel>
                     {
-                        StatusCode = StatusCodes.Status400BadRequest,
                         IsSuccess = false,
-                    };
-                }
-                var user = await _userManger.Users.FirstOrDefaultAsync(x => x.Id == userId);
-                if (user == null)
-                {
-                    return new Dtos.Response<AutModel>
-                    {
-                        StatusCode = StatusCodes.Status400BadRequest,
-                        IsSuccess = false,
+                        StatusCode = (int)HttpStatusCode.BadRequest,
+                        Message = string.Join(", ", refreshTokenValidator.Errors.Select(x => x.ErrorMessage))
                     };
 
                 }
-                if (user.RefreshToken != model.RefreshToken)
-                {
-                    return new Dtos.Response<AutModel>
-                    {
-                        StatusCode = StatusCodes.Status400BadRequest,
-                        IsSuccess = false,
-                    };
 
-                }
-                if (user.IsRevoked)
-                    return new Dtos.Response<AutModel>
-                    {
-                        StatusCode = StatusCodes.Status400BadRequest,
-                        IsSuccess = false,
-                    };
+
+                var user = await _userManger.Users.FirstOrDefaultAsync(x => x.RefreshToken == model.RefreshToken);
                 user.RefreshToken = GenerateRefreshToken();
                 user.RefreshTokenExpiryDate = DateTime.UtcNow.AddDays(12);
                 var accessToken = await CreateToken(user);
@@ -130,25 +115,7 @@ namespace Secuirty.Services
 
         }
 
-        public ClaimsPrincipal GetClaimsPrincipalFromToken(string token)
-        {
 
-            var tokenValidation = new TokenValidationParameters
-            {
-                ValidateAudience = true,
-                ValidateIssuer = true,
-                ValidIssuer = _jwt.Issuer,
-                ValidAudience = _jwt.Audience,
-                ValidateLifetime = false,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key))
-            };
-            var handler = new JwtSecurityTokenHandler();
-
-            var principal = handler.ValidateToken(token, tokenValidation, out SecurityToken outToken);
-
-            return principal;
-        }
         public async Task<Response<AutModel>> LoginAsync(LoginModel model)
         {
             var user = await _userManger.FindByEmailAsync(model.Email);
@@ -220,21 +187,17 @@ namespace Secuirty.Services
             try
             {
 
-                if (await _userManger.FindByNameAsync(model.UserName) is not null)
+                var validator = await _userValidator.ValidateAsync(model);
+                if (!validator.IsValid)
+                {
                     return new Response<AutModel>
                     {
                         IsSuccess = false,
-                        Message = "Already existed",
-                        StatusCode = 400
+                        StatusCode = (int)HttpStatusCode.BadRequest,
+                        Message = string.Join(", ", validator.Errors.Select(x => x.ErrorMessage))
+                    };
+                }
 
-                    };
-                if (await _userManger.FindByEmailAsync(model.Email) is not null)
-                    return new Response<AutModel>
-                    {
-                        IsSuccess = false,
-                        Message = "Already existed",
-                        StatusCode = 400
-                    };
                 var user = new User
                 {
                     FirstName = model.FirstName,
@@ -300,7 +263,24 @@ namespace Secuirty.Services
             }
 
         }
+        private async Task<string> GenerateResetPasswordAsync(User user)
+        {
 
+
+            string token = await _userManger.GeneratePasswordResetTokenAsync(user);
+            var queryDictionary = new Dictionary<string, string>
+            {
+                {"email",user.Email },
+                {"token",token }
+            };
+            var confirmationMethod = $"{_jwt.Issuer}/api/Auth/ResetPassword";
+            var link = QueryHelpers.AddQueryString(confirmationMethod, queryDictionary);
+
+
+
+            return $"<a href={link}>{link}</a>";
+
+        }
         private async Task<string> GenerateConfirmationToken(User user)
         {
 
@@ -461,6 +441,80 @@ namespace Secuirty.Services
                 };
             }
 
+        }
+
+        public async Task<Response<string>> ForgetPasswordAsync(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+                return new Response<string>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = "Invalid Email"
+                };
+            var user = await _userManger.FindByEmailAsync(email);
+            if (user is null)
+                return new Response<string>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = "Invalid Email"
+                };
+
+            var token = await GenerateResetPasswordAsync(user);
+            await _emailService.SendAsync(new EmailModel
+            {
+                Body = token,
+                Subject = "ResetPassword",
+                To = new[] { user.Email }
+            });
+
+            return new Response<string>
+            {
+                IsSuccess = true,
+                StatusCode = StatusCodes.Status200OK,
+                Message = "Reset Message sent please go to Reset Your Password"
+            };
+
+
+
+
+
+
+        }
+
+        public async Task<Response<string>> ResetPasswordAsync(ResetPasswordModel model)
+        {
+            var user = await _userManger.FindByEmailAsync(model.Email);
+            if (user is null)
+            {
+                return new Response<string>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = "Invalid Email"
+                };
+            }
+
+            var result = await _userManger.ResetPasswordAsync(user, model.Token, model.Password);
+            if (!result.Succeeded)
+            {
+                _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
+                return new Response<string>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    Message = string.Join(" , ", result.Errors.Select(x => x.Description))
+                };
+
+            }
+            return new Response<string>
+            {
+
+                IsSuccess = false,
+                StatusCode = StatusCodes.Status200OK,
+                Message = "Reset Password Achieved"
+            };
         }
     }
 

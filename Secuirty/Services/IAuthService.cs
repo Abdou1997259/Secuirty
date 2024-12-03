@@ -11,5 +11,7 @@ namespace Secuirty.Services
         Task<Response<string>> Revoke(string token);
         Task<Response<string>> ConfirmEmail(ConfirmationModel model);
         Task<Response<string>> ResendConfirmationMessage(string email);
+        Task<Response<string>> ForgetPasswordAsync(string email);
+        Task<Response<string>> ResetPasswordAsync(ResetPasswordModel model);
     }
 }
