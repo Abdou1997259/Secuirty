@@ -1,4 +1,5 @@
 using FluentValidation;
+using Hangfire;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -99,6 +100,11 @@ builder.Services.AddAuthentication(options =>
 });
 #endregion
 
+#region BackGroundTasks
+
+builder.Services.AddHangfire(x => x.UseSqlServerStorage(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHangfireServer();
+#endregion
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
@@ -128,12 +134,14 @@ if (app.Environment.IsDevelopment())
 
 #region Custom MiddleWares
 app.UseCustomMiddleWares();
+
 #endregion
 
 #region System MiddleWares
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseHangfireDashboard("/dashboard");
 
 app.MapControllers();
 #endregion
