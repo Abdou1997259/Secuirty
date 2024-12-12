@@ -14,5 +14,6 @@ namespace Secuirty.Services
         Task<Response<string>> ResendConfirmationMessage(string email);
         Task<Response<string>> ForgetPasswordAsync(string email);
         Task<Response<string>> ResetPasswordAsync(ResetPasswordModel model);
+        Task<Response<AutModel>> GoogleLoginAsync(string idToken);
     }
 }

@@ -25,10 +25,11 @@ namespace Secuirty.MiddlerWares
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message, ex);
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
                 context.Response.ContentType = "application/json";
                 if (ex is FluentValidation.ValidationException validations)
                 {
+                    context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
                     var response = new Response<string>
                     {
                         Message = string.Join(", ", validations.Errors),
@@ -39,6 +40,7 @@ namespace Secuirty.MiddlerWares
                 }
                 else
                 {
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                     var response = new Response<string>
                     {
                         Message = "Internal Server Error",

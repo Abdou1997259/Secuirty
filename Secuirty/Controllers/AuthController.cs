@@ -61,8 +61,8 @@ namespace Secuirty.Controllers
             return CreateResponse(result);
 
         }
-        [HttpPost("ForgetPassword")]
-        public async Task<IActionResult> ForgetPasswordAsync(string email)
+        [HttpGet("ForgetPassword")]
+        public async Task<IActionResult> ForgetPasswordAsync([FromQuery] string email)
         {
             var result = await _service.ForgetPasswordAsync(email);
 
@@ -76,6 +76,12 @@ namespace Secuirty.Controllers
 
             return CreateResponse(result);
 
+        }
+        [HttpPost("GoogleLogin")]
+        public async Task<IActionResult> GoogleLogin([FromBody] string idToken)
+        {
+            var result = await _service.GoogleLoginAsync(idToken);
+            return CreateResponse(result);
         }
         private IActionResult CreateResponse<T>(Response<T> response)
         {

@@ -20,8 +20,9 @@ namespace Secuirty.Validators
             RuleFor(x => x.UserName).Cascade(CascadeMode.Stop).NotNull().NotEmpty().WithMessage("must be have value").MustAsync(async (username, _) => await
             _validationService.UserExistenceByUserName(username)).WithMessage("Already existed");
             RuleFor(x => x.Password).Cascade(CascadeMode.Stop).NotNull().NotEmpty().Length(6, 15);
-
-            RuleFor(x => x.ConfirmPassowrd).Cascade(CascadeMode.Stop).NotNull().NotEmpty().Equal(x => x.Password).WithMessage("Ensure the confirm Password");
+            RuleFor(x => x.FirstName).Cascade(CascadeMode.Stop).NotNull().NotEmpty().Length(6, 15);
+            RuleFor(x => x.LastName).Cascade(CascadeMode.Stop).NotNull().NotEmpty().Length(6, 15);
+            RuleFor(x => x.ConfirmPassword).Cascade(CascadeMode.Stop).NotNull().NotEmpty().Equal(x => x.Password).WithMessage("Ensure the confirm Password");
         }
     }
 }

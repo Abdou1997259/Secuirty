@@ -1,10 +1,12 @@
 ﻿
 using FluentValidation;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Secuirty.Commands;
 using Secuirty.Date;
@@ -32,6 +34,7 @@ namespace Secuirty.Services
         private readonly ILogger<AuthService> _logger;
         private readonly IValidator<RegisterModel> _userValidator;
         private readonly IValidator<RefreshTokenModel> _refreshToken;
+        private readonly GoogleAuthConfig _googleOptions;
         public AuthService(
              UserManager<User> userManager,
              Context context,
@@ -39,7 +42,9 @@ namespace Secuirty.Services
              IEmailService emailService,
              ILogger<AuthService> logger,
              IValidator<RegisterModel> userValidator,
-             IValidator<RefreshTokenModel> refreshToken
+             IValidator<RefreshTokenModel> refreshToken,
+             IOptions<GoogleAuthConfig> googleOptions
+
             )
         {
             _userManger = userManager;
@@ -49,6 +54,7 @@ namespace Secuirty.Services
             _logger = logger;
             _userValidator = userValidator;
             _refreshToken = refreshToken;
+            _googleOptions = googleOptions.Value;
 
         }
         private string GenerateRefreshToken()
@@ -266,7 +272,7 @@ namespace Secuirty.Services
                 {"email",user.Email },
                 {"token",token }
             };
-            var confirmationMethod = $"{_jwt.Issuer}/api/Auth/ResetPassword";
+            var confirmationMethod = $"{_jwt.Audience}/auth/reset-password";
             var link = QueryHelpers.AddQueryString(confirmationMethod, queryDictionary);
 
 
@@ -284,7 +290,7 @@ namespace Secuirty.Services
                 {"email",user.Email },
                 {"token",token }
             };
-            var confirmationMethod = $"{_jwt.Issuer}/api/Auth/ConfirmEmail";
+            var confirmationMethod = $"{_jwt.Audience}/auth/confirm";
             var link = QueryHelpers.AddQueryString(confirmationMethod, queryDictionary);
 
 
@@ -508,6 +514,74 @@ namespace Secuirty.Services
                 StatusCode = StatusCodes.Status200OK,
                 Message = "Reset Password Achieved"
             };
+        }
+
+        public async Task<Response<AutModel>> GoogleLoginAsync(string idToken)
+        {
+            var payload = await VerifyGoogleToken(idToken);
+            if (payload == null)
+            {
+                return new Response<AutModel>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status401Unauthorized,
+                    Message = "Invalid Google token"
+                };
+            }
+            var user = await _userManger.FindByEmailAsync(payload.Email);
+            if (user == null)
+            {
+                user = new User
+                {
+                    Email = payload.Email,
+                    UserName = payload.Email,
+                    FirstName = payload.GivenName,
+                    LastName = payload.FamilyName,
+                    EmailConfirmed = true
+                };
+                var createUserResult = await _userManger.CreateAsync(user);
+                if (!createUserResult.Succeeded)
+                {
+                    return new Response<AutModel>
+                    {
+                        IsSuccess = false,
+                        Message = "Failed to create user",
+                        StatusCode = StatusCodes.Status500InternalServerError
+                    };
+                }
+
+            }
+            var token = await CreateToken(user);
+            return new Response<AutModel>
+            {
+                IsSuccess = true,
+                StatusCode = StatusCodes.Status200OK,
+                Data = new AutModel
+                {
+                    AccessToken = token,
+                    RefreshToken = user?.RefreshToken,
+                    RefreshTokenExpiryDate = user.RefreshTokenExpiryDate
+                }
+
+            };
+        }
+
+        private async Task<GoogleJsonWebSignature.Payload> VerifyGoogleToken(string idToken)
+        {
+            try
+            {
+                var settings = new GoogleJsonWebSignature.ValidationSettings()
+                {
+                    Audience = new List<string> { _googleOptions.ClientId }
+                };
+                var payLoad = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
+                return payLoad;
+            }
+            catch
+            {
+                return null;
+            }
+
         }
     }
 

@@ -55,7 +55,9 @@ builder.Services.AddMediatR(cfg =>
 var jwt = new Jwt();
 builder.Configuration.GetSection("Jwt").Bind(jwt);
 builder.Services.AddSingleton(jwt);
-
+var googleOptions = new GoogleAuthConfig();
+builder.Configuration.GetSection("Google").Bind(googleOptions);
+builder.Services.Configure<GoogleAuthConfig>(builder.Configuration.GetSection("Google"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 #endregion
 
@@ -97,6 +99,11 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
         ClockSkew = TimeSpan.Zero
     };
+}).AddGoogle(options =>
+{
+    options.ClientId = googleOptions.ClientId;
+    options.ClientSecret = googleOptions.ClientSecret;
+    options.CallbackPath = "/signin-google";
 });
 #endregion
 
@@ -121,6 +128,12 @@ builder.Services.AddScoped<IValidationService, ValidationService>();
 builder.Services.AddSwaggerGen();
 #endregion
 
+builder.Services.AddCors(x => x.AddPolicy("cors", x =>
+{
+    x.WithOrigins(jwt.Audience).AllowAnyHeader().AllowAnyMethod();
+
+}));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -131,7 +144,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 #endregion
-
+app.UseCors("cors");
 #region Custom MiddleWares
 app.UseCustomMiddleWares();
 
