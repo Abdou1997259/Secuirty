@@ -18,6 +18,8 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -35,6 +37,8 @@ namespace Secuirty.Services
         private readonly IValidator<RegisterModel> _userValidator;
         private readonly IValidator<RefreshTokenModel> _refreshToken;
         private readonly GoogleAuthConfig _googleOptions;
+        private readonly HttpClient _facebookHttpClient;
+        private readonly FaceBookAuthConfig _faceOptions;
         public AuthService(
              UserManager<User> userManager,
              Context context,
@@ -43,7 +47,8 @@ namespace Secuirty.Services
              ILogger<AuthService> logger,
              IValidator<RegisterModel> userValidator,
              IValidator<RefreshTokenModel> refreshToken,
-             IOptions<GoogleAuthConfig> googleOptions
+             IOptions<GoogleAuthConfig> googleOptions,
+             IOptions<FaceBookAuthConfig> faceOptions
 
             )
         {
@@ -55,7 +60,11 @@ namespace Secuirty.Services
             _userValidator = userValidator;
             _refreshToken = refreshToken;
             _googleOptions = googleOptions.Value;
-
+            _facebookHttpClient = new HttpClient
+            {
+                BaseAddress = new Uri("https://graph.facebook.com/")
+            };
+            _faceOptions = faceOptions.Value;
         }
         private string GenerateRefreshToken()
         {
@@ -203,6 +212,8 @@ namespace Secuirty.Services
                     LastName = model.LastName,
                     Email = model.Email,
                     UserName = model.UserName,
+                    RefreshToken = GenerateRefreshToken(),
+                    RefreshTokenExpiryDate = DateTime.UtcNow.Add(TimeSpan.FromDays(12))
 
                 };
                 var result = await _userManger.CreateAsync(user, model.Password);
@@ -213,7 +224,7 @@ namespace Secuirty.Services
                     {
                         StatusCode = 400,
                         IsSuccess = false,
-                        Message = "Something Bad Happen During Update User"
+                        Message = string.Join(" , ", result.Errors.Select(x => x.Description))
                     };
                 }
                 var addRoleUser = await _userManger.AddToRoleAsync(user, "User");
@@ -224,7 +235,7 @@ namespace Secuirty.Services
                     {
                         StatusCode = 400,
                         IsSuccess = false,
-                        Message = "Something Bad Happen During Update User"
+                        Message = string.Join(" , ", result.Errors.Select(x => x.Description))
 
                     };
                 }
@@ -246,6 +257,8 @@ namespace Secuirty.Services
                     {
 
                         AccessToken = token,
+                        RefreshToken = user.RefreshToken,
+                        RefreshTokenExpiryDate = user.RefreshTokenExpiryDate
                     }
                 };
 
@@ -313,7 +326,7 @@ namespace Secuirty.Services
                 new Claim(ClaimTypes.NameIdentifier,user.Id),
                 new Claim(ClaimTypes.GivenName,user.FirstName),
                 new Claim(ClaimTypes.Surname,user.LastName),
-                new Claim(ClaimTypes.Email,user.Email),
+                new Claim(ClaimTypes.Email,user.Email ?? ""),
                 new Claim(ClaimTypes.Name,user.UserName)
             }.Union(claimsRole).Union(userClaims);
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
@@ -582,6 +595,140 @@ namespace Secuirty.Services
                 return null;
             }
 
+        }
+        private async Task<string> ValidateToken(string accessToken)
+        {
+            try
+            {
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
+                var tokenValidationParamter = new TokenValidationParameters
+                {
+
+                    IssuerSigningKey = key,
+                    ValidateAudience = true,
+                    ValidateIssuer = true,
+                    ValidIssuer = _jwt.Issuer,
+                    ValidAudience = _jwt.Audience,
+                    ValidateLifetime = false,
+                    ValidateIssuerSigningKey = true,
+                };
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var result = tokenHandler.ValidateToken(accessToken, tokenValidationParamter, out SecurityToken securityToken);
+                return result?.FindFirst(ClaimTypes.NameIdentifier).Value;
+
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, ex.Message);
+                return null;
+            }
+        }
+        private async Task<bool> FacebookValidateAsync(string facebookToken, string userId)
+        {
+
+            var facebookKey = _faceOptions.AppId + "|" + _faceOptions.AppSecret;
+
+            var fbResult = await _facebookHttpClient.GetFromJsonAsync<FaceResultDto>($"debug_token?input_token={facebookToken}&access_token={facebookKey}");
+            if (fbResult == null || !fbResult.Data.Is_Valid || !fbResult.Data.User_Id.Equals(userId))
+            {
+                return false;
+
+            }
+            return true;
+
+        }
+        public async Task<Response<AutModel>> RegsiterWithThirdParty(RegisterWithThirdPartyModel model)
+        {
+
+            if (model.Provider.Equals(SD.Facebook))
+            {
+                try
+                {
+                    if (!await FacebookValidateAsync(model.AccessToken, model.UserId))
+                    {
+                        return new Response<AutModel>
+                        {
+                            IsSuccess = false,
+                            Message = "invalid facebook access",
+                            StatusCode = StatusCodes.Status401Unauthorized
+                        };
+                    }
+
+
+                }
+                catch (Exception ex)
+                {
+                    return new Response<AutModel>
+                    {
+                        IsSuccess = false,
+                        Message = "invalid facebook access",
+                        StatusCode = StatusCodes.Status401Unauthorized
+                    };
+                }
+
+            }
+            else if (model.Provider.Equals(SD.Google))
+            {
+
+                throw new NotImplementedException();
+            }
+            else
+            {
+                return new Response<AutModel>()
+                {
+                    StatusCode = StatusCodes.Status400BadRequest,
+                    IsSuccess = false
+                };
+
+            }
+            var user = await _userManger.FindByIdAsync(model.UserId);
+            if (user is not null)
+            {
+                return new Response<AutModel>
+                {
+                    IsSuccess = false,
+                    Message = "Already created",
+                    StatusCode = StatusCodes.Status400BadRequest
+                };
+            }
+            var userToAdd = new User
+            {
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                UserName = model.UserId,
+                Provider = model.Provider,
+                RefreshTokenExpiryDate = DateTime.UtcNow.Add(TimeSpan.FromDays(12)),
+                RefreshToken = GenerateRefreshToken(),
+                Email = ""
+
+            };
+            try
+            {
+                var result = await _userManger.CreateAsync(userToAdd);
+
+
+                var token = await CreateToken(userToAdd);
+                return new Response<AutModel>()
+                {
+                    IsSuccess = true,
+                    Data = new AutModel
+                    {
+                        AccessToken = token,
+                        RefreshToken = userToAdd.RefreshToken,
+                        RefreshTokenExpiryDate = userToAdd.RefreshTokenExpiryDate
+                    },
+                    StatusCode = StatusCodes.Status200OK
+                };
+
+            }
+            catch (Exception ex)
+            {
+                return new Response<AutModel>
+                {
+                    IsSuccess = false
+                };
+            }
         }
     }
 

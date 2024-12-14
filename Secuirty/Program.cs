@@ -56,9 +56,12 @@ var jwt = new Jwt();
 builder.Configuration.GetSection("Jwt").Bind(jwt);
 builder.Services.AddSingleton(jwt);
 var googleOptions = new GoogleAuthConfig();
+var faceBookOptions = new FaceBookAuthConfig();
 builder.Configuration.GetSection("Google").Bind(googleOptions);
 builder.Services.Configure<GoogleAuthConfig>(builder.Configuration.GetSection("Google"));
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Configuration.GetSection("FaceBook").Bind(faceBookOptions);
+builder.Services.Configure<FaceBookAuthConfig>(builder.Configuration.GetSection("FaceBook"));
 #endregion
 
 #region  Authentication Register
@@ -72,6 +75,7 @@ builder.Services.AddIdentity<User, IdentityRole>(
        options.Password.RequireDigit = false;
        options.Password.RequireLowercase = false;
        options.Password.RequireUppercase = false;
+
 
 
    }
@@ -104,6 +108,10 @@ builder.Services.AddAuthentication(options =>
     options.ClientId = googleOptions.ClientId;
     options.ClientSecret = googleOptions.ClientSecret;
     options.CallbackPath = "/signin-google";
+}).AddFacebook(options =>
+{
+    options.AppId = faceBookOptions.AppId;
+    options.AppSecret = faceBookOptions.AppSecret;
 });
 #endregion
 

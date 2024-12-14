@@ -83,6 +83,12 @@ namespace Secuirty.Controllers
             var result = await _service.GoogleLoginAsync(idToken);
             return CreateResponse(result);
         }
+        [HttpPost("ThirdPartyRegister")]
+        public async Task<IActionResult> ThirdPartyRegister(RegisterWithThirdPartyModel model)
+        {
+            var result = await _service.RegsiterWithThirdParty(model);
+            return CreateResponse(result);
+        }
         private IActionResult CreateResponse<T>(Response<T> response)
         {
             return StatusCode(response.StatusCode, response);

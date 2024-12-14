@@ -11,6 +11,7 @@ namespace Secuirty.Models
         public DateTime RefreshTokenExpiryDate { get; set; }
         public bool IsActive => RefreshTokenExpiryDate >= DateTime.UtcNow && RefreshToken != null;
         public bool IsRevoked => RefreshToken == null || !IsActive;
+        public string Provider { get; set; }
 
     }
 }

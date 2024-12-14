@@ -7,6 +7,7 @@ namespace Secuirty.Services
     public interface IAuthService
     {
         Task<Response<AutModel>> RegisterAsync(RegisterUserCommand model);
+        Task<Response<AutModel>> RegsiterWithThirdParty(RegisterWithThirdPartyModel model);
         Task<Response<AutModel>> LoginAsync(LoginModel model);
         Task<Response<AutModel>> RefreshTokenAsync(RefreshTokenModel model);
         Task<Response<string>> Revoke(string token);
