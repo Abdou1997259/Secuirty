@@ -4,7 +4,7 @@ using Secuirty.Dtos;
 
 namespace Secuirty.Commands
 {
-    public class RegisterUserCommand : IRequest<Response<AutModel>>
+    public class RegisterUserCommand : IRequest<Response<AuthModel>>
     {
         public string Email { get; set; }
         public string UserName { get; set; }

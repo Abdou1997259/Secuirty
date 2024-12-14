@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Secuirty.Handlers
 {
-    public class RegisterUserHandler : IRequestHandler<RegisterUserCommand, Response<AutModel>>
+    public class RegisterUserHandler : IRequestHandler<RegisterUserCommand, Response<AuthModel>>
     {
 
         private readonly IAuthService _authService;
@@ -17,7 +17,7 @@ namespace Secuirty.Handlers
 
             _authService = authService;
         }
-        public async Task<Response<AutModel>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
+        public async Task<Response<AuthModel>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
         {
 
             return await _authService.RegisterAsync(request);

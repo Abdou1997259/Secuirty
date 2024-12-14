@@ -89,6 +89,12 @@ namespace Secuirty.Controllers
             var result = await _service.RegsiterWithThirdParty(model);
             return CreateResponse(result);
         }
+        [HttpPost("LoginWithThirdPary")]
+        public async Task<IActionResult> LoginWithThirdPary(LoginWithThirdPartyModel model)
+        {
+            var result = await _service.LoginWithThirdPartyAsync(model);
+            return CreateResponse(result);
+        }
         private IActionResult CreateResponse<T>(Response<T> response)
         {
             return StatusCode(response.StatusCode, response);

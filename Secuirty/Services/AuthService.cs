@@ -77,14 +77,14 @@ namespace Secuirty.Services
             }
             return Convert.ToBase64String(numbers);
         }
-        public async Task<Response<AutModel>> RefreshTokenAsync(RefreshTokenModel model)
+        public async Task<Response<AuthModel>> RefreshTokenAsync(RefreshTokenModel model)
         {
             try
             {
                 var refreshTokenValidator = await _refreshToken.ValidateAsync(model);
                 if (!refreshTokenValidator.IsValid)
                 {
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         IsSuccess = false,
                         StatusCode = (int)HttpStatusCode.BadRequest,
@@ -102,16 +102,16 @@ namespace Secuirty.Services
                 if (!result.Succeeded)
                 {
                     _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         IsSuccess = false,
                         StatusCode = (int)HttpStatusCode.NotFound,
                         Message = "Something Bad Happen During Update User"
                     };
                 }
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
-                    Data = new AutModel
+                    Data = new AuthModel
                     {
                         AccessToken = accessToken,
                         RefreshToken = user.RefreshToken,
@@ -122,7 +122,7 @@ namespace Secuirty.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message, ex);
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     StatusCode = StatusCodes.Status500InternalServerError,
@@ -133,14 +133,14 @@ namespace Secuirty.Services
         }
 
 
-        public async Task<Response<AutModel>> LoginAsync(LoginModel model)
+        public async Task<Response<AuthModel>> LoginAsync(LoginModel model)
         {
             var user = await _userManger.FindByEmailAsync(model.Email);
 
 
             if (user == null)
             {
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     Message = "not is Exited",
@@ -150,7 +150,7 @@ namespace Secuirty.Services
             }
             if (!await _userManger.CheckPasswordAsync(user, model.Password))
             {
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     Message = "Username or Password is not valid",
@@ -158,7 +158,7 @@ namespace Secuirty.Services
                 };
             }
             if (!user.EmailConfirmed)
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     Message = "Username or Password is not valid",
@@ -176,7 +176,7 @@ namespace Secuirty.Services
                 if (!result.Succeeded)
                 {
                     _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         IsSuccess = false,
                         StatusCode = (int)HttpStatusCode.NotFound,
@@ -184,10 +184,10 @@ namespace Secuirty.Services
                     };
                 }
             }
-            return new Response<AutModel>
+            return new Response<AuthModel>
             {
                 IsSuccess = true,
-                Data = new AutModel
+                Data = new AuthModel
                 {
                     RefreshToken = user.RefreshToken,
                     RefreshTokenExpiryDate = user.RefreshTokenExpiryDate,
@@ -198,7 +198,7 @@ namespace Secuirty.Services
             };
         }
 
-        public async Task<Response<AutModel>> RegisterAsync(RegisterUserCommand model)
+        public async Task<Response<AuthModel>> RegisterAsync(RegisterUserCommand model)
         {
             var transaction = _context.Database.BeginTransaction();
             try
@@ -220,7 +220,7 @@ namespace Secuirty.Services
                 if (!result.Succeeded)
                 {
                     _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         StatusCode = 400,
                         IsSuccess = false,
@@ -231,7 +231,7 @@ namespace Secuirty.Services
                 if (!addRoleUser.Succeeded)
                 {
                     _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         StatusCode = 400,
                         IsSuccess = false,
@@ -249,11 +249,11 @@ namespace Secuirty.Services
                 var token = await CreateToken(user);
 
                 await transaction.CommitAsync();
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = true,
                     StatusCode = 201,
-                    Data = new AutModel
+                    Data = new AuthModel
                     {
 
                         AccessToken = token,
@@ -266,7 +266,7 @@ namespace Secuirty.Services
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     Error = ex.Message,
@@ -529,12 +529,12 @@ namespace Secuirty.Services
             };
         }
 
-        public async Task<Response<AutModel>> GoogleLoginAsync(string idToken)
+        public async Task<Response<AuthModel>> GoogleLoginAsync(string idToken)
         {
             var payload = await VerifyGoogleToken(idToken);
             if (payload == null)
             {
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     StatusCode = StatusCodes.Status401Unauthorized,
@@ -555,7 +555,7 @@ namespace Secuirty.Services
                 var createUserResult = await _userManger.CreateAsync(user);
                 if (!createUserResult.Succeeded)
                 {
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         IsSuccess = false,
                         Message = "Failed to create user",
@@ -565,11 +565,11 @@ namespace Secuirty.Services
 
             }
             var token = await CreateToken(user);
-            return new Response<AutModel>
+            return new Response<AuthModel>
             {
                 IsSuccess = true,
                 StatusCode = StatusCodes.Status200OK,
-                Data = new AutModel
+                Data = new AuthModel
                 {
                     AccessToken = token,
                     RefreshToken = user?.RefreshToken,
@@ -638,7 +638,7 @@ namespace Secuirty.Services
             return true;
 
         }
-        public async Task<Response<AutModel>> RegsiterWithThirdParty(RegisterWithThirdPartyModel model)
+        public async Task<Response<AuthModel>> RegsiterWithThirdParty(RegisterWithThirdPartyModel model)
         {
 
             if (model.Provider.Equals(SD.Facebook))
@@ -647,7 +647,7 @@ namespace Secuirty.Services
                 {
                     if (!await FacebookValidateAsync(model.AccessToken, model.UserId))
                     {
-                        return new Response<AutModel>
+                        return new Response<AuthModel>
                         {
                             IsSuccess = false,
                             Message = "invalid facebook access",
@@ -659,7 +659,7 @@ namespace Secuirty.Services
                 }
                 catch (Exception ex)
                 {
-                    return new Response<AutModel>
+                    return new Response<AuthModel>
                     {
                         IsSuccess = false,
                         Message = "invalid facebook access",
@@ -675,7 +675,7 @@ namespace Secuirty.Services
             }
             else
             {
-                return new Response<AutModel>()
+                return new Response<AuthModel>()
                 {
                     StatusCode = StatusCodes.Status400BadRequest,
                     IsSuccess = false
@@ -685,7 +685,7 @@ namespace Secuirty.Services
             var user = await _userManger.FindByIdAsync(model.UserId);
             if (user is not null)
             {
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false,
                     Message = "Already created",
@@ -709,10 +709,10 @@ namespace Secuirty.Services
 
 
                 var token = await CreateToken(userToAdd);
-                return new Response<AutModel>()
+                return new Response<AuthModel>()
                 {
                     IsSuccess = true,
-                    Data = new AutModel
+                    Data = new AuthModel
                     {
                         AccessToken = token,
                         RefreshToken = userToAdd.RefreshToken,
@@ -724,11 +724,85 @@ namespace Secuirty.Services
             }
             catch (Exception ex)
             {
-                return new Response<AutModel>
+                return new Response<AuthModel>
                 {
                     IsSuccess = false
                 };
             }
+        }
+
+        public async Task<Response<AuthModel>> LoginWithThirdPartyAsync(LoginWithThirdPartyModel model)
+        {
+            try
+            {
+
+                if (model.Provider.Equals(SD.Facebook))
+                {
+
+                    if (!await FacebookValidateAsync(model.AccessToken, model.UserId))
+                    {
+                        return new Response<AuthModel>
+                        {
+                            Message = "invalid facebook login",
+                            IsSuccess = false,
+                            StatusCode = StatusCodes.Status401Unauthorized
+                        };
+                    }
+
+                }
+
+
+            }
+            catch (Exception ex)
+            {
+                return new Response<AuthModel>
+                {
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status400BadRequest
+                };
+            }
+
+            var user = await _userManger.Users.FirstOrDefaultAsync(x => x.UserName == model.UserId && x.Provider == model.Provider);
+            if (user == null)
+            {
+                return new Response<AuthModel>
+                {
+                    Message = "invalid facebook account",
+                    IsSuccess = false,
+                    StatusCode = StatusCodes.Status401Unauthorized
+                };
+            }
+            if (user.IsRevoked)
+            {
+                var refreshToken = GenerateRefreshToken();
+                user.RefreshToken = refreshToken;
+                user.RefreshTokenExpiryDate = DateTime.UtcNow.AddDays(12);
+
+
+                var result = await _userManger.UpdateAsync(user);
+                if (!result.Succeeded)
+                {
+                    _logger.LogError(string.Join(" , ", result.Errors.Select(x => x.Description)));
+                    return new Response<AuthModel>
+                    {
+                        IsSuccess = false,
+                        StatusCode = (int)HttpStatusCode.NotFound,
+                        Message = "Something Bad Happen During Update User"
+                    };
+                }
+            }
+            return new Response<AuthModel>
+            {
+                IsSuccess = true,
+                Data = new AuthModel
+                {
+                    RefreshToken = user.RefreshToken,
+                    RefreshTokenExpiryDate = user.RefreshTokenExpiryDate,
+                    AccessToken = await CreateToken(user),
+
+                },
+                StatusCode = StatusCodes.Status200OK
+            };
         }
     }
 
